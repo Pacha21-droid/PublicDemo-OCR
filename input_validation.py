@@ -45,12 +45,12 @@ def process_chunk(filepath: str):
                     raise ValueError("File is invalid, it doesn't correspond to valid image format")
                 is_validated = True
             total_bytes += len(chunk)
-            if total_bytes > MAX_CHUNK_SIZE:
+            if total_bytes > MAX_FILE_SIZE:
                 buffer.close()
                 raise ValueError("File rejected, it exceeded max limit")
             buffer.write(chunk)
     buffer.seek(0)
-    return buffer, total_bytes
+    return buffer
 
 # Get image properties
 def process_image_info(buffer):
@@ -69,7 +69,7 @@ def process_image_info(buffer):
             clean_buffer=io.BytesIO()
             save_format="PNG" if image_format=="PNG" else "JPEG"
             if save_format=="JPEG" and img_decode.mode in ("RGBA","P"):
-                img_decode.convert("RGB")
+                img_decode=img_decode.convert("RGB")
             img_decode.save(clean_buffer,format=save_format)
             clean_buffer.seek(0)
             img_info = {
@@ -91,10 +91,14 @@ def pickImage():
         initialdir=downloads_path,
         title="Select File",
         filetypes=[("Image Files", "*.jpg *.jpeg *.png *.webp *.bmp"), ("All Files", "*.*")])
-    if file_path and os.path.getsize(file_path) <= MAX_FILE_SIZE:
-        print("Selected file:", file_path)
-        img = cv2.imread(file_path)
-        print("Success")
-        return img
-    else:
-        raise ValueError("File is larger than 10MB or the path is invalid")
+    if not file_path:
+        print("File selection error")
+        return None
+    if os.path.getsize(file_path)>MAX_FILE_SIZE:
+        raise ValueError("File is larger than 10MB")
+    print("Selected file: ",file_path)
+    buffer=process_chunk(file_path)
+    img_info=process_image_info(buffer)
+    print("Success")
+    secure_img=Image.open(img_info["buffer"])
+    return secure_img    
