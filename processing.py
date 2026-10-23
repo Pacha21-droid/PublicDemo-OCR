@@ -33,3 +33,12 @@ def layout_analysis(boxes):
     return sorted_boxes
 
 #Process orchestration(def)
+def process_pipeline(preprocessed_img):
+    gray=cv2.cvtColor(preprocessed_img,cv2.COLOR_BGR2GRAY)
+    binary=binarize(gray)
+    clean=clean_morpho(binary)
+    boxes=extract_bounding_boxes(clean)
+    sorted=layout_analysis(boxes)
+    config=r'--oem 3 --psm 6'
+    raw=pytesseract.image_to_string(clean,config=config)
+    return raw,sorted    
