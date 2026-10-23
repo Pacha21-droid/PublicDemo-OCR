@@ -1,7 +1,7 @@
 import os,re,json
-from spellchecker import Spellchecker
+from spellchecker import SpellChecker
 
-spell=Spellchecker()
+spell=SpellChecker()
 def check_spelling(text):
     cleaned=re.sub(r'(?<=\w)[|](?=\w)','l',text)
     cleaned=re.sub(r'\s+','',cleaned).strip()
