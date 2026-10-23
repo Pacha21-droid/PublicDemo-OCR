@@ -2,7 +2,6 @@ import cv2
 import numpy as np
 
 img=''
-gray=cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
 
 #Detecting blurry image and applying unsharp masking to the blurry ones
 def check_blur(gray,thresh=1000.00):
@@ -79,3 +78,27 @@ def evaluate_img(gray):
     flags={"FixBlur":blurry,"Enhance":needs_contrast,"Deskew":needs_skew}
     scores={"Blur":blur_val,"Contrast":contrast_val,"Angle":skew_angle,"Bright":bright,"Dark":dark}
     return flags,scores
+
+#Preprocess orchestration(def)
+def preprocess_pipeline(img):
+    gray=cv2.cvtColor(img,cv2.COLOR_BGR2GRAY) if len(img.shape) == 3 else img
+    is_blurry,blur_score=check_blur(gray)
+    if is_blurry:
+        print(f"Image is blurry! Blur score {blur_score}.Applying sharpening.")
+        img=fix_blur(img)
+        gray=cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+
+    needs_skew,angle=check_skew(gray)
+    if needs_skew:
+        print(f"Image needs deskewing! Angle:{angle}.Applying deskewing.")
+        img=fix_skew(img,angle)
+        gray=cv2.cvtColor(img,cv2.COLOR_BGR2GRAY)
+
+    report=analyze_hist(gray)
+    contrast_fixed,contrast_applied=fix_contrast(gray,report)
+    if contrast_applied:
+        print("Low contrast! Applying normalization.")
+        img=contrast_fixed
+
+    gray=fix_noise(gray)
+    print("Preprocess completed")
