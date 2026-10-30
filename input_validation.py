@@ -1,9 +1,12 @@
-import os,io
+import os
+from io import BytesIO
+from typing import BinaryIO
 import tkinter as tk
 import cv2
+import numpy as np
 from tkinter import filedialog
 from pathlib import Path
-from PIL import Image,ImageFile,ImageOps
+from PIL import Image,ImageFile,ImageOps,UnidentifiedImageError
 
 #Constants
 MAX_IMG_HEIGHT=4096
@@ -13,92 +16,111 @@ MAX_FILE_SIZE=10*1024*1024
 MAX_CHUNK_SIZE=8192
 ALLOWED_MIME_TYPES={"images/jpeg","images/png","images/webp","images/bmp"}
 ALLOWED_IMG_TYPES={
-    b"\xff\xd8\xff":"images/jpeg",
-    b"\x89PNG\r\n\x1a\n":"images/png",
-    b"BM":"images/bmp"}
+    "JPEG": (b"\xff\xd8\xff",),
+    "PNG": (b"\x89PNG\r\n\x1a\n",),
+    "BMP": (b"BM",),
+    "WEBP": (b"RIFF",)}
 
 Image.MAX_IMAGE_PIXELS=MAX_IMG_PIXELS
 ImageFile.LOAD_TRUNCATED_IMAGES=False
 def validate_header(chunk: bytes) -> bool:
-    chunk_lower = chunk[:128].lower()
-    if b"<?xml" in chunk_lower or b"<svg" in chunk_lower or b"<! doctype svg" in chunk_lower:
+    if not chunk:
         return False
-    if any(chunk.startswith(signature) for signature in ALLOWED_IMG_TYPES):
+    if chunk.startswith(ALLOWED_IMG_TYPES["JPEG"][0]):
         return True
-    if len(chunk) >= 12 and chunk.startswith(b"RIFF") and chunk[8:12] == b"WEBP":
+    if chunk.startswith(ALLOWED_IMG_TYPES["PNG"][0]):
+        return True
+    if chunk.startswith(ALLOWED_IMG_TYPES["BMP"][0]):
+        return True
+    if(chunk.startswith(b"RIFF")
+        and len(chunk)>=12
+        and chunk[8:12]==b"WEBP"):
         return True
     return False
 
 # Defining buffer for reading chunks, and checking them for anomalies
-def process_chunk(filepath: str):
+def process_chunk(file_object:BinaryIO,max_size:int=MAX_FILE_SIZE):
     total_bytes = 0
-    buffer = io.BytesIO()
-    is_validated = False
-    with open(filepath, "rb") as stream:
+    buffer = BytesIO()
+    first_chunk=True
+    try:
         while True:
-            chunk = stream.read(MAX_CHUNK_SIZE)
-            if not chunk and total_bytes == 0: raise ValueError("File is empty")
+            chunk=file_object.read(MAX_CHUNK_SIZE)
             if not chunk:
                 break
-            if not is_validated:
+            if first_chunk:
                 if not validate_header(chunk):
-                    raise ValueError("File is invalid, it doesn't correspond to valid image format")
-                is_validated = True
-            total_bytes += len(chunk)
-            if total_bytes > MAX_FILE_SIZE:
-                buffer.close()
-                raise ValueError("File rejected, it exceeded max limit")
+                    raise ValueError("Unsupported or invalid image file.")
+                first_chunk=False
+            total_bytes+=len(chunk)
+            if total_bytes>max_size:
+                raise ValueError(f"Image exceeds {max_size // (1024 * 1024)} MB size limit.")
             buffer.write(chunk)
-    buffer.seek(0)
-    return buffer
+            if total_bytes==0:
+                raise ValueError("The file is empty.")
+            buffer.seek(0)    
+            return buffer
+    except Exception():
+        buffer.close()
+        raise
 
 # Get image properties
-def process_image_info(buffer):
+def process_image_info(buffer:BytesIO)->dict:
     try:
-        with Image.open(buffer) as img:
-            image_format = img.format
-            img.verify()
-            width,height=img.size
-            if width>MAX_IMG_WIDTH or height>MAX_IMG_HEIGHT or (width*height)>MAX_IMG_PIXELS:
-                raise ValueError(f"Image dimensions are too large. They exceed safe limits: {width}x{height}")
-            
         buffer.seek(0)
-        with Image.open(buffer) as img_decode:
-            img_decode.load()
-            img_decode=ImageOps.exif_transpose(img_decode)
-            clean_buffer=io.BytesIO()
-            save_format="PNG" if image_format=="PNG" else "JPEG"
-            if save_format=="JPEG" and img_decode.mode in ("RGBA","P"):
-                img_decode=img_decode.convert("RGB")
-            img_decode.save(clean_buffer,format=save_format)
-            clean_buffer.seek(0)
-            img_info = {
-                "size_bytes": clean_buffer.getbuffer().nbytes,
-                "format": save_format,
-                "dimensions": img_decode.size,
-                "mode": img_decode.mode,
-                "buffer":clean_buffer}
-            return img_info
-    except Exception as e:
-        raise ValueError(f"Image format invalid or corrupted file: {e}")
+        with Image.open(buffer) as img:
+            image_format=(img.format or "").upper()
+            if image_format not in ALLOWED_IMG_TYPES:
+                raise ValueError("Only JPEG,PNG,BMP and WEBP supported")
+            width,height=img.size
+            if width<=0 or height<=0:
+                raise ValueError(f"Image dimensions are invalid.")
+            if(width>MAX_IMG_WIDTH or height>MAX_IMG_HEIGHT or width*height>MAX_IMG_PIXELS):
+                raise ValueError(f"Image dimensions are large,they exceed safety limit: {MAX_IMG_PIXELS}.")
+            img.verify()  
+        buffer.seek(0)
+        with Image.open(buffer) as src:
+            img_decode=ImageOps.exif_transpose(src).convert("RGB")
+            width,height=img_decode.size
+            if(width>MAX_IMG_WIDTH or height>MAX_IMG_HEIGHT or width*height>MAX_IMG_PIXELS):
+                raise ValueError(f"Oriented image dimensions are large,they exceed safety limit: {MAX_IMG_PIXELS}.")
+            normalized=BytesIO()
+            img_decode.save(normalized,format="PNG",optimize=True)
+            normalized.seek(0)
+            return{"buffer":normalized,
+                   "format":image_format,"width":width,
+                    "height":height,"mode":"RGB"}
+    except(UnidentifiedImageError, OSError) as e:
+        raise ValueError(f"Image format invalid or corrupted file: {e}") from e
+    finally:
+        buffer.close()
 
 # Get image from your OS
-def pickImage():
-    root = tk.Tk()
-    root.withdraw()
-    downloads_path = Path.home() / "Downloads"
-    file_path = filedialog.askopenfilename(
+def pickImage(filepath:str|Path|None=None):
+    if filepath is None:
+        root = tk.Tk()
+        root.withdraw()
+        downloads_path = Path.home() / "Downloads"
+        file_path = filedialog.askopenfilename(
         initialdir=downloads_path,
         title="Select File",
         filetypes=[("Image Files", "*.jpg *.jpeg *.png *.webp *.bmp"), ("All Files", "*.*")])
-    if not file_path:
-        print("File selection error")
-        return None
-    if os.path.getsize(file_path)>MAX_FILE_SIZE:
-        raise ValueError("File is larger than 10MB")
-    print("Selected file: ",file_path)
-    buffer=process_chunk(file_path)
-    img_info=process_image_info(buffer)
-    print("Success")
-    secure_img=Image.open(img_info["buffer"])
-    return secure_img    
+        root.destroy()
+        if not downloads_path:
+         return None
+        filepath=downloads_path
+        if os.path.getsize(file_path)>MAX_FILE_SIZE:
+            raise ValueError("File is larger than 10MB.")
+    path=Path(filepath).expanduser()
+    if not path.is_file():
+        raise FileNotFoundError("Image does not exist.")
+    with path.open("rb") as src:
+        buffer=process_chunk(src)
+    info=process_image_info(buffer)
+    try:
+        with Image.open(info["buffer"]) as pil_img:
+            rgb=np.asarray(pil_img.convert("RGB"))
+        img_bgr=cv2.cvtColor(rgb,cv2.COLOR_RGB2BGR)
+    finally:
+        info["buffer"].close()
+    return img_bgr,str(path.resolve())
