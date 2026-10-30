@@ -23,7 +23,11 @@ def analyze_hist(gray,min_dyn_range=50):
     highlights = np.sum(gray > 245) / total_pixels 
     too_dark = mean_intensity < 85 and shadows > 0.25
     too_bright = mean_intensity > 170 and highlights > 0.25
-    return dict(needs_contrast,dyn_range,too_bright,too_dark)
+    return{
+        "needs_contrast":needs_contrast,
+        "dyn_range":dyn_range,
+        "too_bright":too_bright,
+        "too_dark":too_dark}
 
 def fix_contrast(gray,report):
     if report["needs_contrast"]:
