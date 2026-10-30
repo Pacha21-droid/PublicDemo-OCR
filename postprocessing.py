@@ -66,4 +66,18 @@ def validate_and_apply_rules(extracted:dict, text:str):
     extracted["emails"] = cleaned_emails
     return is_valid, errors
 
+#Classificatior
+def classify(text:str)->str:
+    text_lower=text.lower()
+    result="document"
+    if any(key in text_lower for key in["invoice", "bill to", "due date", "subtotal"]):
+        result="invoice"
+    elif any(key in text_lower for key in ["report", "summary", "analysis", "findings"]):
+       result="report"
+    elif any(key in text_lower for key in ["study", "abstract", "methodology", "conclusion"]):
+        result="study"
+    elif any(key in text_lower for key in ["receipt", "cashier", "change due", "thank you"]):
+        result="receipt"
+    return result
+
 #Post-Process orchestration(def)
