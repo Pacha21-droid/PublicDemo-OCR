@@ -25,11 +25,11 @@ def analyze_hist(gray,min_dyn_range=50):
     highlights = np.sum(gray > 245) / total_pixels 
     too_dark = mean_intensity < 85 and shadows > 0.25
     too_bright = mean_intensity > 170 and highlights > 0.25
-    return needs_contrast,dyn_range,too_bright,too_dark
+    return dict(needs_contrast,dyn_range,too_bright,too_dark)
 
 def fix_contrast(gray,report):
     if report["needs_contrast"]:
-        clahe=cv2.createCLAHE(clipLimit=2.0,titleGridSize=(8,8))
+        clahe=cv2.createCLAHE(clipLimit=2.0,tileGridSize=(8,8))
         return clahe.apply(gray),True
     if report["too_dark"] or report["too_bright"]:
         normalized=cv2.normalize(gray,None,0,255,norm_type=cv2.NORM_MINMAX)
@@ -99,6 +99,6 @@ def preprocess_pipeline(img):
     if contrast_applied:
         print("Low contrast! Applying normalization.")
         img=contrast_fixed
-
     gray=fix_noise(gray)
     print("Preprocess completed")
+    return gray
