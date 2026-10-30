@@ -114,3 +114,11 @@ def save_output(type,payload,image_name,base_dir="output"):
     return str(filepath)
 
 #Post-Process orchestration(def)
+def postprocess_pipeline(raw,image_name,base_dir="output"):
+    spell_checked=check_spelling(raw)
+    regex_extracted=extract_fields_regex(spell_checked)
+    valid, errors = validate_and_apply_rules(regex_extracted,spell_checked)
+    classified=classify(spell_checked)
+    formatted=format_text(spell_checked,classified,regex_extracted,valid,errors,raw)
+    saved=(formatted,image_name,base_dir)
+    return saved,formatted
