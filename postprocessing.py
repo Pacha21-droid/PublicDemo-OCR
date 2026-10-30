@@ -1,6 +1,7 @@
 import os,re,json
 from spellchecker import SpellChecker
 
+#Checking grammar mistakes
 spell=SpellChecker()
 def check_spelling(text):
     cleaned=re.sub(r'(?<=\w)[|](?=\w)','l',text)
@@ -21,4 +22,16 @@ def check_spelling(text):
         else:
             corrected.append(word) 
         return " ".join(corrected)
+
+#Extract valuable fields
+def extract_fields_regex(text:str)->dict:
+    emails=re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', text)
+    dates=re.findall(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', text)
+    prices=re.findall(r'[$€£]\s?\d+(?:\.\d{2})?', text)
+    results={"emails":emails,
+             "dates":dates,
+             "prices":prices}
+    return results
+
+
 #Post-Process orchestration(def)
