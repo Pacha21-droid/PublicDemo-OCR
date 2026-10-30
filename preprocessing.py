@@ -1,8 +1,6 @@
 import cv2
 import numpy as np
 
-img=''
-
 #Detecting blurry image and applying unsharp masking to the blurry ones
 def check_blur(gray,thresh=1000.00):
     var=cv2.Laplacian(gray,cv2.CV_64F).var()
