@@ -25,7 +25,7 @@ def check_spelling(text):
         return " ".join(corrected)
 
 #Extract valuable fields
-def extract_fields_regex(text:str)->dict:
+def extract_fields_regex(text):
     emails=re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', text)
     dates=re.findall(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', text)
     prices=re.findall(r'[$€£]\s?\d+(?:\.\d{2})?', text)
@@ -35,7 +35,7 @@ def extract_fields_regex(text:str)->dict:
     return results
 
 #Mini rules engine
-def validate_and_apply_rules(extracted:dict, text:str):
+def validate_and_apply_rules(extracted,text):
     is_valid=True
     errors=[]
     text_lower=text.lower()
@@ -68,7 +68,7 @@ def validate_and_apply_rules(extracted:dict, text:str):
     return is_valid, errors
 
 #Classificatior
-def classify(text:str)->str:
+def classify(text):
     text_lower=text.lower()
     result="document"
     if any(key in text_lower for key in["invoice", "bill to", "due date", "subtotal"]):
@@ -82,7 +82,7 @@ def classify(text:str)->str:
     return result
 
 #Formatter
-def format_text(text:str,type:str,metadata:str,errors:None,valid:True,raw_text:False)->dict:
+def format_text(text,type,metadata,errors:None,valid:True,raw_text:False):
     clean_text=text.strip() if isinstance(text, str) else str(text)
     if raw_text:
         return clean_text
@@ -98,7 +98,7 @@ def format_text(text:str,type:str,metadata:str,errors:None,valid:True,raw_text:F
     return payload
 
 #Save to file
-def save_output(type:str,payload:dict,image_name:str,base_dir="output"):
+def save_output(type,payload,image_name,base_dir="output"):
     class_dir=Path(base_dir) / type
     class_dir.mkdir(parents=True,exist_ok=True)
     base_name=os.path.splitext(os.path.basename(image_name))[0]
