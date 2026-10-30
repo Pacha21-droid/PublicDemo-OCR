@@ -10,20 +10,22 @@ def binarize(gray):
 
 #Perform morphology
 def clean_morpho(binary):
+    inverted=cv2.bitwise_not(binary)
     kernel=cv2.getStructuringElement(cv2.MORPH_RECT,(2,2))
-    cleaned=cv2.morphologyEx(binary,cv2.MORPH_OPEN,kernel)
+    cleaned=cv2.morphologyEx(inverted,cv2.MORPH_OPEN,kernel)
     cleaned=cv2.morphologyEx(cleaned,cv2.MORPH_CLOSE,kernel)
-    return cleaned
+    return cv2.bitwise_not(cleaned)
 
 #Get the contours and define the bounding box
 def extract_bounding_boxes(cleaned):
-    contours,_=cv2.findContours(cleaned,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+    foreground=cv2.bitwise_not(cleaned)
+    contours,_=cv2.findContours(foreground,cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
     boxes=[]
     for c in contours:
         x,y,width,height=cv2.boundingRect(c)
         if width>5 and height>5:
             boxes.append((x,y,width,height))
-        return boxes
+    return boxes
 
 #Perform sorting by height and width
 def layout_analysis(boxes):
