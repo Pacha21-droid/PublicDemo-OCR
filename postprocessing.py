@@ -1,5 +1,6 @@
 import os,re,json
 from spellchecker import SpellChecker
+from pathlib import Path
 
 #Checking grammar mistakes
 spell=SpellChecker()
@@ -96,5 +97,20 @@ def format_text(text:str,type:str,metadata:str,errors:None,valid:True,raw_text:F
             }}
     return payload
 
+#Save to file
+def save_output(type:str,payload:dict,image_name:str,base_dir="output"):
+    class_dir=Path(base_dir) / type
+    class_dir.mkdir(parents=True,exist_ok=True)
+    base_name=os.path.splitext(os.path.basename(image_name))[0]
+    if isinstance(payload,str):
+        filepath=class_dir / f"{base_name}.txt"
+        filepath.write_text(payload,encoding="utf-8")
+        print(f"Saved raw text to {filepath}")
+    elif isinstance(payload,dict):
+        filepath=class_dir / f"{base_name}.json"
+        with open(filepath,"w",encoding="utf-8") as f:
+            json.dump(payload,f,indent=4,ensure_ascii=False)
+        print(f"Saved structured JSON to {filepath}")    
+    return str(filepath)
 
 #Post-Process orchestration(def)
