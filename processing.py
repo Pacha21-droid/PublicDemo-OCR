@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import pytesseract
 from preprocessing import to_gray
+from __future__ import annotations
 
 #Define the threshold
 def binarize(gray:np.ndarray)->np.ndarray:

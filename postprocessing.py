@@ -1,6 +1,7 @@
 import os,re,json
 from spellchecker import SpellChecker
 from pathlib import Path
+from __future__ import annotations
 
 #Checking grammar mistakes
 spell=SpellChecker()

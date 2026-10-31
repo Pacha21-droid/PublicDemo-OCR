@@ -2,7 +2,7 @@ from input_validation import pickImage
 from preprocessing import preprocess_pipeline
 from processing import process_pipeline
 from postprocessing import postprocess_pipeline
-
+from __future__ import annotations
 import cv2
 
 class PipelineBus:
