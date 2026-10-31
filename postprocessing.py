@@ -3,41 +3,52 @@ from spellchecker import SpellChecker
 from pathlib import Path
 from __future__ import annotations
 
+def match_case(original:str,replacement:str)->str:
+    if original.isupper():
+        return replacement.isupper()
+    if original.islower():
+        return replacement.islower()
+    if original.istitle():
+        return replacement.istitle()
+    return replacement
+
+
 #Checking grammar mistakes
 spell=SpellChecker()
-def check_spelling(text):
-    cleaned=re.sub(r'(?<=\w)[|](?=\w)','l',text)
-    cleaned=re.sub(r'\s+','',cleaned).strip()
-    words=cleaned.split()
-    corrected=[]
-    for word in words:
-        if any(char.isdigit() for char in word) or '@' in word or re.match(r'^[$€£#]',word):
-            corrected.append(word)
-            continue
-        match=re.match(r'^([^\w]*)([\w]+)([^\w]*)$',word)
-        if match:
-           prefix,core,suffix=match.groups()
-           if core.lower() in spell.unknown([core.lower()]):
-               correction=spell.correction(core)
-               core=correction if correction else core
-               corrected.append(f"{prefix}{core}{suffix}")
-        else:
-            corrected.append(word) 
-        return " ".join(corrected)
+def check_spelling(text:str)->str:
+    if not text:
+        return text
+    cleaned=re.sub(r"(?<=\w)\|(?=\w)","l",text)
+    if spell is None:
+        return cleaned
+    def replace_token(match):
+        token=match.group(0)
+        parts=re.match(r"^([^\w]*)([\w'-]+)([^\w]*)$",token,flags=re.UNICODE)
+        if not parts:
+            return token
+        prefix,core,suffix=parts.groups()
+        if not core.isalpha() or len(core)<3:
+            return token
+        candidate = spell.correction(core.lower())
+        if not candidate:
+            return token
+        if candidate.lower()==core.lower():
+            return token
+        corrected = match_case(core,candidate)
+        return prefix+corrected+suffix
+    return re.sub(r"\S+",replace_token,cleaned)
 
 #Extract valuable fields
-def extract_fields_regex(text):
-    emails=re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+', text)
-    dates=re.findall(r'\b\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\b', text)
-    prices=re.findall(r'[$€£]\s?\d+(?:\.\d{2})?', text)
-    results={"emails":emails,
-             "dates":dates,
-             "prices":prices}
-    return results
+def extract_fields_regex(text:str)->dict:
+    emails=re.findall(r'[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+',text)
+    dates=re.findall( r"\b(?:"r"\d{4}[-/]\d{1,2}[-/]\d{1,2}"r"|"r"\d{1,2}[-/]\d{1,2}[-/]\d{2,4}"r")\b",text)
+    prices=re.findall(r'[$€£]\s?\d+(?:\.\d{2})?',text)
+    return{"emails":list(dict.fromkeys(emails)),
+           "dates":list(dict.fromkeys(dates)),
+           "prices":list(dict.fromkeys(prices))}
 
 #Mini rules engine
-def validate_and_apply_rules(extracted,text):
-    is_valid=True
+def validate_and_apply_rules(extracted:dict,text:str):
     errors=[]
     text_lower=text.lower()
     
