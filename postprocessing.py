@@ -1,5 +1,4 @@
 import os,re,json
-from spellchecker import SpellChecker
 from pathlib import Path
 from __future__ import annotations
 
@@ -14,7 +13,12 @@ def match_case(original:str,replacement:str)->str:
 
 
 #Checking grammar mistakes
-spell=SpellChecker()
+try:
+    from spellchecker import SpellChecker
+    spell=SpellChecker()
+except ImportError:
+    spell = None
+
 def check_spelling(text:str)->str:
     if not text:
         return text
@@ -50,37 +54,20 @@ def extract_fields_regex(text:str)->dict:
 #Mini rules engine
 def validate_and_apply_rules(extracted:dict,text:str):
     errors=[]
-    text_lower=text.lower()
-    
-    if len(extracted["prices"])==0 and "total" in text_lower:
-        errors.append("Uncertainty: 'Total' mentioned in text, but no prices were extracted.")
-        is_valid = False
-        
-    if len(extracted["prices"])>3 and "total" not in text_lower:
-        errors.append("Uncertainty: Multiple prices found (>3) without a clear 'total' keyword to disambiguate.")
-        is_valid=False
-
-    if ("contact us" in text_lower or "reach out at" in text_lower or "email us" in text_lower) and len(extracted["emails"])==0:
-        errors.append("Uncertainty: Contact prompt detected ('email us'/'contact'), but no email address was extracted.")
-        is_valid=False
-
-    time_sensitive_keywords=["due date", "invoice date", "expires", "deadline", "valid until"]
-    if any(keyword in text_lower for keyword in time_sensitive_keywords) and len(extracted["dates"])==0:
-        errors.append("Uncertainty: Time-sensitive keywords found, but no dates were extracted.")
-        is_valid=False
-
-    cleaned_emails=[]
-    for email in extracted["emails"]:
-        if email.endswith('.'):
-            errors.append(f"Uncertainty: Email '{email}' contains a trailing period, suggesting it caught sentence punctuation.")
-            cleaned_emails.append(email.rstrip('.'))
-        else:
-            cleaned_emails.append(email)
-    extracted["emails"]=cleaned_emails
-    return is_valid, errors
+    lower_text=text.lower()
+    if(re.search(r"\b(total|amount due|balance due)\b",lower_text) and not extracted.get("prices")):
+        errors.append("A total or amount is mentioned,but no price was detected.")
+    if(len(extracted.get("prices", []))>3 and not re.search(r"\b(total|grand total|amount due)\b",lower_text)):
+        errors.append("Several prices were detected,but no total label was found.")
+    if(re.search(r"\b(email|e-mail|contact)\b",lower_text) and not extracted.get("emails")):
+        errors.append("Contact information is mentioned,but no email address was detected.")
+    if(re.search(r"\b(due date|deadline|appointment|meeting)\b",lower_text) and not extracted.get("dates")):
+        errors.append("A date-sensitive item is mentioned,but no numeric date was detected.")
+    valid=len(errors)==0
+    return valid,errors
 
 #Classificatior
-def classify(text):
+def classify(text:str)->str:
     text_lower=text.lower()
     result="document"
     if any(key in text_lower for key in["invoice", "bill to", "due date", "subtotal"]):
@@ -94,43 +81,33 @@ def classify(text):
     return result
 
 #Formatter
-def format_text(text,type,metadata,errors:None,valid:True,raw_text:False):
-    clean_text=text.strip() if isinstance(text, str) else str(text)
+def format_text(text:str,type:str,metadata,errors:None,valid:True,raw_text:False):
     if raw_text:
-        return clean_text
-    if errors is None:
-        errors=[]
-    payload={"document_info": {
-            "document_type":type,
-            "status":"valid" if valid else "flagged",},
-            "extracted_data":metadata,
-            "validation_errors":errors,
-            "content":{"full_text":clean_text
-            }}
-    return payload
+        return text
+    return{"document_type":type,"text":text,"metadata":metadata,
+        "valid":bool(valid),"errors":list(errors or [])}
 
 #Save to file
-def save_output(type,payload,image_name,base_dir="output"):
-    class_dir=Path(base_dir) / type
-    class_dir.mkdir(parents=True,exist_ok=True)
-    base_name=os.path.splitext(os.path.basename(image_name))[0]
+def save_output(type:str,payload,image_name:str,base_dir:str="output")->str:
+    safe_type=re.sub(r"[^A-Za-z0-9_-]+","_",str(type).lower()).strip("_") or "document"
+    source_stem=Path(image_name).stem
+    safe_stem=re.sub(r"[^A-Za-z0-9_-]+","_",source_stem).strip("_") or "ocr_result"
+    output_dir=Path(base_dir)/safe_type
+    output_dir.mkdir(parents=True,exist_ok=True)
     if isinstance(payload,str):
-        filepath=class_dir / f"{base_name}.txt"
-        filepath.write_text(payload,encoding="utf-8")
-        print(f"Saved raw text to {filepath}")
-    elif isinstance(payload,dict):
-        filepath=class_dir / f"{base_name}.json"
-        with open(filepath,"w",encoding="utf-8") as f:
-            json.dump(payload,f,indent=4,ensure_ascii=False)
-        print(f"Saved structured JSON to {filepath}")    
-    return str(filepath)
+        output_path=output_dir/f"{safe_stem}.txt"
+        output_path.write_text(payload,encoding="utf-8")
+    else:
+        output_path=output_dir/f"{safe_stem}.json"
+        output_path.write_text(json.dumps(payload,ensure_ascii=False,indent=2),encoding="utf-8")
+    return str(output_path.resolve())
 
 #Post-Process orchestration(def)
 def postprocess_pipeline(raw,image_name,base_dir="output"):
     spell_checked=check_spelling(raw)
     regex_extracted=extract_fields_regex(spell_checked)
-    valid, errors = validate_and_apply_rules(regex_extracted,spell_checked)
+    valid,errors=validate_and_apply_rules(regex_extracted,spell_checked)
     classified=classify(spell_checked)
-    formatted=format_text(spell_checked,classified,regex_extracted,valid,errors,raw)
-    saved=(formatted,image_name,base_dir)
-    return saved,formatted
+    formatted=format_text(spell_checked,classified,regex_extracted,errors=errors,valid=valid,raw_text=False)
+    saved_path=save_output(classified,formatted,image_name,base_dir)
+    return saved_path,classified,formatted
