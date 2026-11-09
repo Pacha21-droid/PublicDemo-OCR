@@ -1,6 +1,6 @@
+from __future__ import annotations
 import cv2
 import numpy as np
-from __future__ import annotations
 
 #Grayscale function
 def to_gray(img:np.ndarray)->np.ndarray:
