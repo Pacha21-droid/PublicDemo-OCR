@@ -80,10 +80,10 @@ def classify(text:str)->str:
     return result
 
 #Formatter
-def format_text(text:str,type:str,metadata,errors:None,valid:True,raw_text:False):
+def format_text(text:str,doc_type:str,metadata,errors:None,valid:True,raw_text:False):
     if raw_text:
         return text
-    return{"document_type":type,"text":text,"metadata":metadata,
+    return{"document_type":doc_type,"text":text,"metadata":metadata,
         "valid":bool(valid),"errors":list(errors or [])}
 
 #Save to file
