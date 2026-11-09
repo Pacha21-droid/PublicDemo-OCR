@@ -56,7 +56,7 @@ def layout_analysis(boxes:list[tuple[int,int,int,int]])->list[tuple[int,int,int,
             distance=abs(center_y-line["center"])
             if (distance<=tolerance and(best_distance is None or distance<best_distance)):
                 best_line=line
-                best_distance=best_distance
+                best_distance=distance
         if best_line is None:
             lines.append({"center":center_y,"boxes":[box]})
         else:
@@ -66,7 +66,7 @@ def layout_analysis(boxes:list[tuple[int,int,int,int]])->list[tuple[int,int,int,
         ordered=[]
         for line in lines:
             ordered.extend(sorted(line["boxes"],key=lambda box:box[0]))
-        return ordered
+    return ordered
 
 #Process orchestration(def)
 def process_pipeline(preprocessed_img:np.ndarray,config:str="--oem 3 --psm 6"):
