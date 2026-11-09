@@ -42,25 +42,23 @@ def validate_header(chunk: bytes) -> bool:
 def process_chunk(file_object:BinaryIO,max_size:int=MAX_FILE_SIZE):
     total_bytes = 0
     buffer = BytesIO()
-    first_chunk=True
     try:
         while True:
             chunk=file_object.read(MAX_CHUNK_SIZE)
             if not chunk:
                 break
-            if first_chunk:
+            if total_bytes==0:
                 if not validate_header(chunk):
                     raise ValueError("Unsupported or invalid image file.")
-                first_chunk=False
             total_bytes+=len(chunk)
             if total_bytes>max_size:
                 raise ValueError(f"Image exceeds {max_size // (1024 * 1024)} MB size limit.")
             buffer.write(chunk)
             if total_bytes==0:
                 raise ValueError("The file is empty.")
-            buffer.seek(0)    
-            return buffer
-    except Exception():
+        buffer.seek(0)    
+        return buffer
+    except Exception:
         buffer.close()
         raise
 
@@ -98,29 +96,33 @@ def process_image_info(buffer:BytesIO)->dict:
 # Get image from your OS
 def pickImage(filepath:str|Path|None=None):
     if filepath is None:
-        root = tk.Tk()
+        root=tk.Tk()
         root.withdraw()
-        downloads_path = Path.home() / "Downloads"
-        file_path = filedialog.askopenfilename(
-        initialdir=downloads_path,
-        title="Select File",
-        filetypes=[("Image Files", "*.jpg *.jpeg *.png *.webp *.bmp"), ("All Files", "*.*")])
-        root.destroy()
-        if not downloads_path:
-         return None
-        filepath=downloads_path
-        if os.path.getsize(file_path)>MAX_FILE_SIZE:
-            raise ValueError("File is larger than 10MB.")
+        downloads_path=Path.home() / "Downloads"
+        try:
+            file_path = filedialog.askopenfilename(
+                initialdir=str(downloads_path),
+                title="Select File",
+                filetypes=[("Image Files", "*.jpg *.jpeg *.png *.webp *.bmp"),("All Files", "*.*")])
+        finally:
+            root.destroy()
+        if not file_path:
+            return None
+        filepath=file_path
     path=Path(filepath).expanduser()
     if not path.is_file():
-        raise FileNotFoundError("Image does not exist.")
+        raise FileNotFoundError(
+            f"Image does not exist: {path}")
+    if path.stat().st_size>MAX_FILE_SIZE:
+        raise ValueError("File is larger than 10MB.")
     with path.open("rb") as src:
         buffer=process_chunk(src)
     info=process_image_info(buffer)
     try:
         with Image.open(info["buffer"]) as pil_img:
-            rgb=np.asarray(pil_img.convert("RGB"))
-        img_bgr=cv2.cvtColor(rgb,cv2.COLOR_RGB2BGR)
+            rgb=np.asarray(
+            pil_img.convert("RGB"))
+            img_bgr=cv2.cvtColor(rgb,cv2.COLOR_RGB2BGR)
     finally:
         info["buffer"].close()
     return img_bgr,str(path.resolve())
