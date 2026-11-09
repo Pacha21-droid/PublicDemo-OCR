@@ -36,7 +36,7 @@ def analyze_hist(gray:np.ndarray,min_dyn_range:int=50):
     shadow_intensity=float(np.mean(gray<40))
     highlights=float(np.mean(gray>220))
     too_bright=(mean_intensity>190 and highlights>0.35)
-    too_dark=(mean_intensity>75 and shadow_intensity>0.35)
+    too_dark=(mean_intensity<100 and shadow_intensity>0.35)
     needs_contrast=(dyn_range<min_dyn_range or too_bright or too_dark)
     return(needs_contrast,dyn_range,too_dark,too_bright)
 
@@ -49,7 +49,7 @@ def fix_contrast(gray:np.ndarray,report=None)->np.ndarray:
         too_dark=report.get("too_dark",False)
         too_bright=report.get("too_bright",False)
     else:
-        report=(needs_contrast,_,too_dark,too_bright)
+        needs_contrast,_,too_dark,too_bright=report
     if not needs_contrast:
         return gray
     clahe=cv2.createCLAHE(clipLimit=2.0,tileGridSize=(8,8))
@@ -89,7 +89,7 @@ def check_skew(gray:np.ndarray,angle_range:tuple[float,float]=(-15,15),step:floa
         if score>best_score:
             best_score=score
             best_angle=float(angle)
-        return best_angle
+    return best_angle
 
 def fix_skew(img:np.ndarray,angle:float)->np.ndarray:
     if img is None:
@@ -110,7 +110,7 @@ def fix_skew(img:np.ndarray,angle:float)->np.ndarray:
 #For overall test
 def evaluate_img(gray:np.ndarray)->dict:
     gray=to_gray(gray)
-    (needs_contrast,dyn_range,too_bright,too_dark)=analyze_hist(gray)
+    (needs_contrast,dyn_range,too_dark,too_bright)=analyze_hist(gray)
     blur_score=float(cv2.Laplacian(gray,cv2.CV_64F).var())
     skew_angle=check_skew(gray)
     return{"is_blurry":blur_score < 1000.0,
