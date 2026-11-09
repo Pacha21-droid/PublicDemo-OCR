@@ -1,6 +1,6 @@
+from __future__ import annotations
 import os,re,json
 from pathlib import Path
-from __future__ import annotations
 
 def match_case(original:str,replacement:str)->str:
     if original.isupper():
@@ -10,7 +10,6 @@ def match_case(original:str,replacement:str)->str:
     if original.istitle():
         return replacement.istitle()
     return replacement
-
 
 #Checking grammar mistakes
 try:
