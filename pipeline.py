@@ -52,10 +52,22 @@ def create_pipeline()->PipelineBus:
     def process_stage(ctx):
         print("[Process] Binarizing, cleaning morphology, and extracting text...")
         if "preprocessed_img" not in ctx:
-            raise KeyError("Preprocessed image is not provided from the previous stage")
-        raw,ordered=process_pipeline(ctx["preprocessed_img"])
+         raise KeyError("Preprocessed image is not provided.")
+        raw,ordered,processed_img = process_pipeline(
+        ctx["preprocessed_img"])
         ctx["raw_text"]=raw
         ctx["layout_boxes"]=ordered
+        ctx["processed_img"]=processed_img
+        output_dir = Path(ctx.get("output_dir", "output"))
+        image_output_dir=output_dir/"processed_images"
+        image_output_dir.mkdir(parents=True,exist_ok=True)
+        image_name=Path(ctx["image_path"]).stem
+        processed_image_path=(image_output_dir/f"{image_name}_processed.png")
+        success=cv2.imwrite(str(processed_image_path),processed_img)
+        if not success:
+         raise IOError(f"Could not save processed image:{processed_image_path}")
+        ctx["processed_image_path"]=str(processed_image_path.resolve())
+        print(f"Processed image saved:{processed_image_path}")
         return ctx
 
     #Post processing
@@ -81,6 +93,7 @@ def run_pipeline(image_path=None,output_dir="output"):
 if __name__=="__main__":
     result=run_pipeline()
     print("\n OCR pipeline completed.")
-    print(f"Document type: {result["doc_type"]}")
-    print(f"Saved result: {result["saved_path"]}") 
-    print(f"Extracted text: {result["raw_text"]}") 
+    print(f"Document type:{result["doc_type"]}")
+    print(f"Saved result:{result["saved_path"]}") 
+    print(f"Extracted text:{result["raw_text"]}")
+    print(f"Saved processed image:{result['processed_image_path']}")

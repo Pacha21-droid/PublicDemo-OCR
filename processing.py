@@ -76,4 +76,4 @@ def process_pipeline(preprocessed_img:np.ndarray,config:str="--oem 3 --psm 6"):
     boxes=extract_bounding_boxes(clean)
     sorted=layout_analysis(boxes)
     raw=pytesseract.image_to_string(clean,config=config)
-    return raw,sorted
+    return raw,sorted,clean
