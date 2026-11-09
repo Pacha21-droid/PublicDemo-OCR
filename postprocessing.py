@@ -4,11 +4,11 @@ from pathlib import Path
 
 def match_case(original:str,replacement:str)->str:
     if original.isupper():
-        return replacement.isupper()
+        return replacement.upper()
     if original.islower():
-        return replacement.islower()
+        return replacement.lower()
     if original.istitle():
-        return replacement.istitle()
+        return replacement.title()
     return replacement
 
 #Checking grammar mistakes
