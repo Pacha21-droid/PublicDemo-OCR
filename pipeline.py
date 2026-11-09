@@ -1,8 +1,8 @@
+from __future__ import annotations
 from input_validation import pickImage
 from preprocessing import preprocess_pipeline
 from processing import process_pipeline
 from postprocessing import postprocess_pipeline
-from __future__ import annotations
 from pathlib import Path
 import cv2
 
@@ -76,7 +76,7 @@ def create_pipeline()->PipelineBus:
 
 def run_pipeline(image_path=None,output_dir="output"):
     context={"image_path":(str(image_path) if image_path is not None else None),"output_dir":str(output_dir)}
-    pipeline=create_pipeline
+    pipeline=create_pipeline()
     return pipeline.run(context)
 if __name__=="__main__":
     result=run_pipeline()
